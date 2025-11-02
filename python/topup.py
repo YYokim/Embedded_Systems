@@ -2,7 +2,7 @@ import serial
 import re
 from toll_functions import top_up_balance, get_user_data
 
-port = 'COM12'  # Change to your RFID reader port
+port = 'COM20'  # Change to your RFID reader port
 baud_rate = 9600
 
 print("=== RFID Top-Up Mode ===")

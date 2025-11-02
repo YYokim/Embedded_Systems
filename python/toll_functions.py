@@ -42,6 +42,27 @@ def insert_transaction(uid, name, address, balance, role, entry_exit):
     except Exception as e:
         print(f"Database insert error: {e}")
 
+# ===============================
+# NEW: SQLite Fetch Function for Dashboard
+# ===============================
+def fetch_recent_transactions(limit=10):
+    """Fetch the latest transactions from SQLite for web dashboard display."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT ID, UID, Name, Address, Balance, Role, Type, Date
+            FROM Transaction_TB
+            ORDER BY ID DESC
+            LIMIT ?
+        ''', (limit,))
+        transactions = cursor.fetchall()
+        conn.close()
+        # Convert Row objects to list of dictionaries for Flask's jsonify
+        return [dict(row) for row in transactions]
+    except Exception as e:
+        print(f"Database fetch error: {e}")
+        return []
 
 # ===============================
 # Firebase Helper Functions

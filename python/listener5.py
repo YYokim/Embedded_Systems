@@ -2,8 +2,9 @@ import serial
 import threading
 import sqlite3
 import re
+import json
 from datetime import datetime
-from toll_functions import get_user_data, deduct_balance  # Firebase helper functions
+from toll_functions import get_user_data, deduct_balance, insert_transaction  # Firebase helper functions
 
 # ===============================
 # Serial Configuration
@@ -12,35 +13,40 @@ entrance_port = 'COM8'   # Arduino for entrance
 exit_port = 'COM12'      # Arduino for exit
 baud_rate = 9600
 print_lock = threading.Lock()
+STATUS_FILE = 'rfid_status.json'
 
 # ===============================
-# SQLite Local Database
+# NEW: RFID Status Reporting Function
 # ===============================
-def get_db_connection():
-    conn = sqlite3.connect('Toll_System.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def insert_transaction(uid, name, address, balance, role, entry_exit):
-    """Save scanned user info to local SQLite database"""
+def update_rfid_status(reader_label, message):
+    """Writes the latest activity to a shared JSON file for the web dashboard."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Attempt to read existing data
+        try:
+            with open(STATUS_FILE, 'r') as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Default state if file is new or corrupt
+            data = {
+                "entrance_reader_status": "Listening...",
+                "exit_reader_status": "Listening...",
+                "listener_state": "RUNNING"
+            }
 
-        cursor.execute('''
-            INSERT INTO Transaction_TB (UID, Name, Address, Balance, Role, Type, Date)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (uid, name, address, balance, role, entry_exit, current_date))
-
-        conn.commit()
-        conn.close()
-
-        print(f"Saved locally → UID: {uid}, Type: {entry_exit}, Balance: ₱{balance}")
+        # Update specific fields based on the event
+        if reader_label == "ENTRANCE":
+            data["entrance_reader_status"] = message
+        elif reader_label == "EXIT":
+            data["exit_reader_status"] = message
+        
+        data["last_activity_time"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        data["last_activity"] = f"[{reader_label}] {message}"
+        
+        with open(STATUS_FILE, 'w') as f:
+            json.dump(data, f, indent=4)
     except Exception as e:
-        print(f"Database insert error: {e}")
-
+        # Log the error, but don't crash the main listener thread
+        print(f"[STATUS-UPDATE-ERROR] {e}")
 
 # ===============================
 # UID Cleaning Function
