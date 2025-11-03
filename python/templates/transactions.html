@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Toll System Dashboard</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f4f4f4; }
+        h1 { color: #333; margin-bottom: 30px; }
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+            width: 90%; 
+            max-width: 1200px; 
+            margin-top: 20px; 
+        }
+        .panel { 
+            background-color: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+        }
+        h2 { 
+            border-bottom: 2px solid #007bff; 
+            padding-bottom: 10px; 
+            color: #007bff;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.9em; }
+        th { background-color: #f0f0f0; }
+        .status-ok { color: green; font-weight: bold; }
+        .status-alert { color: red; font-weight: bold; }
+        .message-success { color: green; font-weight: bold; }
+        .message-error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🚗 Toll Gate Management Dashboard</h1>
+
+    <div class="dashboard">
+        
+        <div class="panel" id="rfid-status-panel">
+            <h2>💳 RFID Status</h2>
+            <p>Listener State: <span id="listener-state">N/A</span></p>
+            <p>Entrance Reader: <span id="entrance-status">N/A</span></p>
+            <p>Exit Reader: <span id="exit-status">N/A</span></p>
+            <hr>
+            <p>Last Activity (<span id="last-activity-time">N/A</span>): <span id="last-activity">Loading...</span></p>
+        </div>
+
+        <div class="panel" id="flood-control-panel">
+            <h2>⚠️ Flood Control (Firebase)</h2>
+            <p>DB Path: <code>/FloodControlStatus</code></p>
+            <p>Status: <span id="flood-status-text">Loading...</span></p>
+            <p>Water Level: <span id="flood-level">N/A</span></p>
+        </div>
+        
+        <div class="panel">
+            <h2>💰 Top-Up</h2>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <p class="message-{{ category }}">{{ message }}</p>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <form method="POST" action="{{ url_for('dashboard') }}">
+                <label for="topup_uid">Last Scanned UID:</label><br>
+                <input type="text" 
+                        id="topup_uid" 
+                        name="topup_uid" 
+                        pattern="[A-Fa-f0-9]{8}" 
+                        value="{{ last_uid if last_uid else '' }}"
+                        required 
+                        placeholder="Scan Card or Enter Manually"><br><br>
+                        
+                <label for="topup_amount">Top-Up Amount (₱):</label><br>
+                <input type="number" id="topup_amount" name="topup_amount" min="1" required><br><br>
+                
+                <button type="submit" name="process_topup" value="true">Process Top-Up</button>
+            </form>
+        </div>
+
+        <div class="panel" id="transactions-history-panel">
+            <h2>📜 Transaction History (Latest 15)</h2>
+            <table id="transaction-table">
+                <thead>
+                    <tr><th>Time</th><th>UID</th><th>Name</th><th>Type</th><th>Balance</th></tr>
+                </thead>
+                <tbody>
+                    {# Initial load is handled here. JS will overwrite this. #}
+                    {% for t in transactions %}
+                    <tr>
+                        <td>{{ t.get('Date', '')[-8:] }}</td>
+                        <td>{{ t.get('UID', '') }}</td>
+                        <td>{{ t.get('Name', '') }}</td>
+                        <td>{{ t.get('Type', '') }}</td>
+                        <td>₱{{ t.get('Balance', 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // ==================================
+        // JavaScript for Real-Time Updates (Polling API Endpoints)
+        // ==================================
+        
+        const POLLING_INTERVAL = 3000; // 3 seconds
+
+        function updateTransactions() {
+            fetch('{{ url_for('api_transactions') }}')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('transaction-table').getElementsByTagName('tbody')[0];
+                    tableBody.innerHTML = ''; // Clear current table
+                    
+                    data.forEach(t => {
+                        const row = tableBody.insertRow();
+                        row.insertCell().textContent = t.Date ? t.Date.slice(-8) : 'N/A'; // Time
+                        row.insertCell().textContent = t.UID;
+                        row.insertCell().textContent = t.Name;
+                        row.insertCell().textContent = t.Type;
+                        row.insertCell().textContent = '₱' + t.Balance;
+                    });
+                })
+                .catch(error => console.error('Error fetching transactions:', error));
+        }
+        
+        function updateFloodControl() {
+            fetch('{{ url_for('api_flood_control') }}')
+                .then(response => response.json())
+                .then(data => {
+                    const statusText = document.getElementById('flood-status-text');
+                    const levelText = document.getElementById('flood-level');
+                    
+                    statusText.textContent = data.status;
+                    levelText.textContent = data.level;
+                    
+                    // Simple styling based on status/level
+                    if (data.status === 'OK' || data.level < 50) {
+                        statusText.className = 'status-ok';
+                    } else if (data.status === 'ALERT' || data.level >= 50) {
+                        statusText.className = 'status-alert';
+                    } else {
+                        statusText.className = '';
+                    }
+                })
+                .catch(error => console.error('Error fetching flood control status:', error));
+        }
+
+        function updateRfidStatus() {
+            fetch('{{ url_for('api_rfid_status') }}')
+                .then(response => response.json())
+                .then(data => {
+                    // Update main status panel
+                    document.getElementById('listener-state').textContent = data.listener_state;
+                    document.getElementById('entrance-status').textContent = data.entrance_reader_status;
+                    document.getElementById('exit-status').textContent = data.exit_reader_status;
+                    document.getElementById('last-activity-time').textContent = data.last_activity_time ? data.last_activity_time.slice(-8) : 'N/A';
+                    document.getElementById('last-activity').textContent = data.last_activity;
+                    
+                    // *** NEW: Auto-fill Top-Up UID field ***
+                    const uidInput = document.getElementById('topup_uid');
+                    const scannedUid = data.last_scanned_uid;
+                    
+                    // Only auto-fill if the input field is currently empty or matches the old scanned UID
+                    // and a new UID has been detected (scannedUid is not empty).
+                    if (scannedUid && uidInput.value !== scannedUid) {
+                        uidInput.value = scannedUid;
+                    }
+                    // The UID is cleared by the POST request in app.py after a successful top-up, 
+                    // which is reflected by the last_uid Jinja variable on the next page load.
+                })
+                .catch(error => console.error('Error fetching RFID status:', error));
+        }
+
+        // Run the update functions periodically
+        setInterval(updateTransactions, POLLING_INTERVAL); 
+        setInterval(updateFloodControl, POLLING_INTERVAL); 
+        setInterval(updateRfidStatus, POLLING_INTERVAL);
+
+        // Initial loads
+        updateTransactions();
+        updateFloodControl();
+        updateRfidStatus();
+    </script>
+</body>
+</html>

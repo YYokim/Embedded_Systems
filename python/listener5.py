@@ -1,6 +1,5 @@
 import serial
 import threading
-import sqlite3
 import re
 import json
 from datetime import datetime
@@ -9,11 +8,11 @@ from toll_functions import get_user_data, deduct_balance, insert_transaction  # 
 # ===============================
 # Serial Configuration
 # ===============================
-entrance_port = 'COM8'   # Arduino for entrance
-exit_port = 'COM12'      # Arduino for exit
+entrance_port = ''   # Edit port for entrance
+exit_port = ''      # Edit port for exit
 baud_rate = 9600
 print_lock = threading.Lock()
-STATUS_FILE = 'rfid_status.json'
+STATUS_FILE = 'rfid_status.json' #if doesnt work, add a rfid_status.json file directly
 
 # ===============================
 # NEW: RFID Status Reporting Function
@@ -66,6 +65,7 @@ def listen_to_port(port_name, label):
     try:
         ser = serial.Serial(port_name, baud_rate, timeout=1)
         print(f"[{label}] Listening on {port_name}")
+        update_rfid_status(label, "Listening...")
 
         while True:
             line = ser.readline().decode('utf-8').strip()
@@ -83,6 +83,7 @@ def listen_to_port(port_name, label):
                 if not user_info:
                     print(f"[{label}] UID not found in Firebase → Access Denied")
                     ser.write(b'CLOSE\n')
+                    update_rfid_status(label, f"Access Denied: UID {cleaned_uid} Not Found")
                     continue
 
                 access_granted = False

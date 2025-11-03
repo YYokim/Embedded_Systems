@@ -15,13 +15,14 @@ import firebase_admin
 STATUS_FILE = 'rfid_status.json'
 LAST_SCANNED_UID = None
 UID_LOCK = threading.Lock() 
-TOPUP_PORT = 'COM20' # *** IMPORTANT: CHANGE THIS to your Raspi top-up reader port! ***
+TOPUP_PORT = '' #Add the proper port for the top-up RFID reader 
 BAUD_RATE = 9600
 FLOOD_CONTROL_PATH = '/FloodControlStatus' # Path in Firebase DB
 
 # Initialize Flask
 app = Flask(__name__)
-app.secret_key = 'your_strong_secret_key_here' # Necessary for flash messages
+# *** 2. PLACEHOLDER FOR GENERATED SECRET KEY ***
+app.secret_key = 'GENERATE_A_LONG_RANDOM_SECRET_KEY_HERE' # Necessary for flash messages
 
 # Initialize Firebase
 if not firebase_admin._apps:
@@ -80,7 +81,6 @@ def serial_listener_thread():
 
     except serial.SerialException as e:
         print(f"[TOPUP-READER] ERROR: Serial connection failed on {TOPUP_PORT}. {e}")
-        # Optionally set LAST_SCANNED_UID = "SERIAL_ERROR" for display
     except Exception as e:
         print(f"[TOPUP-READER] UNEXPECTED ERROR: {e}")
 
@@ -92,6 +92,7 @@ def serial_listener_thread():
 def api_transactions():
     """API 1: Feeds the Transaction History Panel (from SQLite)."""
     try:
+        # Fetching 15 transactions to match the updated HTML header
         data = fetch_recent_transactions(limit=15)
         return jsonify(data)
     except Exception as e:
@@ -99,8 +100,14 @@ def api_transactions():
 
 @app.route('/api/rfid_status')
 def api_rfid_status():
-    """API 2: Feeds the RFID Status Panel (from rfid_status.json)."""
-    return jsonify(read_rfid_status())
+    """API 2: Feeds the RFID Status Panel AND Last Scanned UID (from rfid_status.json)."""
+    status_data = read_rfid_status()
+    
+    # *** 3. API ENHANCEMENT: ADD LAST_SCANNED_UID FOR LIVE TOP-UP FIELD ***
+    with UID_LOCK:
+        status_data['last_scanned_uid'] = LAST_SCANNED_UID or '' 
+        
+    return jsonify(status_data)
 
 @app.route('/api/flood_control')
 def api_flood_control():
@@ -150,8 +157,8 @@ def dashboard():
     with UID_LOCK:
         current_scanned_uid = LAST_SCANNED_UID
         
-    # Initial data fetch for table (will be overwritten by JS polling)
-    transactions = fetch_recent_transactions(limit=10) 
+    # Initial data fetch for table (matching the API limit of 15)
+    transactions = fetch_recent_transactions(limit=15) 
     
     return render_template(
         'transactions.html', 
