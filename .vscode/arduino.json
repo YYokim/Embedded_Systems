@@ -1,0 +1,15 @@
+{
+    "tollgate": {
+        "sketch": "Entrance/Entrance.ino",
+        "board": "arduino:avr:uno",
+        "port": "/dev/ttyUSB0"
+    },
+    "exit_gate": {
+        "sketch": "Exit/Exit.ino",
+        "board": "arduino:avr:uno",
+        "port": "/dev/ttyUSB1"
+    },
+    "board": "arduino:avr:uno",
+    "port": "/dev/ttyUSB1",
+    "sketch": "Entrance/Entrance.ino"
+}
