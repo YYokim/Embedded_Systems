@@ -1,8 +1,9 @@
 {
-    "entrance_reader_status": "Gate Closed for UID CCB54105",
-    "exit_reader_status": "Gate Closed for UID CCB54105",
+    "entrance_reader_status": "Listening...",
+    "exit_reader_status": "Listening...",
     "listener_state": "RUNNING",
-    "last_activity_time": "2025-11-12 20:33:51",
-    "last_activity": "[ENTRANCE] Gate Closed for UID CCB54105",
+    "last_activity_time": "2025-11-12 21:09:22",
+    "last_activity": "[EXIT] Listening..."
+}.",
     "last_scanned_uid": ""
 }
