@@ -47,8 +47,11 @@ void setup() {
   rfid.PCD_Init();
 
   gateServo.attach(SERVO_PIN);
-  gateServo.write(0); 
-  gateServo.detach(); 
+  gateServo.write(0);
+  gateServo.detach();
+
+  // Notify Python listener that Arduino is ready
+  Serial.println("READY");
 }
 
 void loop() {
@@ -82,22 +85,31 @@ void loop() {
       }
       uid.toUpperCase();
 
-      Serial.println(uid); // Send UID to Python
+      // Send UID to Python listener
+      Serial.print("UID:");
+      Serial.println(uid);
 
       rfid.PICC_HaltA();
       delay(1000);
     }
   }
 
-  // Listen for Python commands
+  // Listen for commands from Python (listener.py)
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
     command.trim();
 
     if (command == "OPEN") {
       openGate();
-    } else if (command == "CLOSE") {
+
+      // Send confirmation to Python to update Firebase to true
+      Serial.println("FIREBASE:TRUE");
+    } 
+    else if (command == "CLOSE") {
       closeGate();
+
+      // Send confirmation to Python to update Firebase to false
+      Serial.println("FIREBASE:FALSE");
     }
   }
 
@@ -132,7 +144,7 @@ void openGate() {
   display.display();
 
   gateServo.attach(SERVO_PIN);
-  gateServo.write(180);
+  gateServo.write(90);
   delay(3000);
   gateServo.write(0);
   delay(500);

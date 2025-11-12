@@ -153,26 +153,3 @@ def get_gate_states():
     except Exception as e:
         print(f"[GATE-FETCH-ERROR] {e}")
         return {"ENTRANCE": False, "EXIT": False}
-
-# ===============================
-# 🧾 Transaction Retrieval
-# ===============================
-def fetch_recent_transactions(limit=15):
-    """Fetch recent transactions from the local SQLite database (Transaction_TB)."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT UID, Name, Address, Balance, Role, Type, Date
-            FROM Transaction_TB
-            ORDER BY datetime(Date) DESC
-            LIMIT ?
-        ''', (limit,))
-        rows = cursor.fetchall()
-        conn.close()
-
-        transactions = [dict(row) for row in rows]
-        return transactions
-    except Exception as e:
-        print(f"[DB-FETCH-ERROR] {e}")
-        return []
